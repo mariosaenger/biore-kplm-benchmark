@@ -228,21 +228,40 @@ def generate_examples(
         num_context_sentences: int,
         label_to_id: Dict[str, int],
         limit_documents: Optional[int] = None,
-        entity_side_information: Dict[str, str] = None,
+        textual_context_information: Dict[str, str] = None,
         embedding_configurations: List[EmbeddingConfiguration] = None,
         structure_encoding_configurations: List[MoleculeStructureEncoderConfiguration] = None,
-        additional_train_data: Optional[List[Dataset]] = None
 ) -> List[Dict]:
+    """ Generates all training examples for a given dataset and split.
+
+    :param dataset: Loaded BigBio data set
+    :param mention_mapping: Mapping between mention ids and entity knowledge base ids
+    :param splits: Data set split for which the examples should be created
+    :param pair_generation_strategy: Pair generation strategy to be used
+    :param tokenizer: Tokenizer for processing the sentences
+    :param pair_types: List of valid entity type pairs (e.g., [(Chemical, Disease)])
+    :param entity_marker: Entity marker strategy to be used
+    :param max_sentence_distance: Maximal sentence distance between two entities consituting a pair
+    :param max_length: Max length of the examples text
+    :param blind_entities: Indicates whether to blind entities or not
+    :param use_norel_class: Indicates whether to use a special no relation class
+    :param input_prompt: Prompt which should be prepended to the input text
+    :param add_text_prompt: Additional text prompt
+    :param num_context_sentences: Number of additional context sentences
+    :param label_to_id: Relation name to relation index mapping
+    :param limit_documents: Limit the number of documents for which input examples should be created
+    :param textual_context_information: Additional textual context information to be used
+    :param embedding_configurations: Configured embedded context information
+    :param structure_encoding_configurations: Configured molecular context information
+
+    :return: List of examples
+    """
     embedding_configurations = embedding_configurations if embedding_configurations is not None else []
     structure_encoding_configurations = structure_encoding_configurations if structure_encoding_configurations is not None else []
 
     documents = [document for split in splits for document in dataset[split]]
     if limit_documents:
         documents = documents[:limit_documents]
-
-    if additional_train_data:
-        for dataset in additional_train_data:
-            documents.extend([doc for doc in dataset])
 
     str_enc_to_tokenizer = {}
     for str_encoding_config in structure_encoding_configurations:
@@ -364,9 +383,9 @@ def generate_examples(
             tail_mention_id = document["document_id"] + "_" + tail_entity["id"]
             tail_id = mention_mapping.get(tail_mention_id, "")
 
-            if entity_side_information:
-                head_text = entity_side_information.get(head_id, "")
-                tail_text = entity_side_information.get(tail_id, "")
+            if textual_context_information:
+                head_text = textual_context_information.get(head_id, "")
+                tail_text = textual_context_information.get(tail_id, "")
 
                 if add_text_prompt and len(head_text) > 0:
                     head_type = ENTITY_TYPE_TO_DEFAULT_NAME[head_entity["type"].lower()]
@@ -474,21 +493,19 @@ def generate_examples(
             examples.append({
                 "document_id": document["id"],
                 "head_id": head_entity["id"],
-                #"head_entity_id": head_id,
                 "tail_id": tail_entity["id"],
-                #"tail_entity_id": tail_id,
                 "relations": pair_to_relations[pair_id],
                 "features": features
             })
 
     log.warning(f"  Truncated pairs: {num_truncated_pairs} ({num_truncated_pairs/len(examples)})")
     log.warning(f"  Intersentence pairs: {num_intersentence_pairs} ({num_intersentence_pairs/len(examples)})")
-    #input()
 
     return examples
 
 
 class BigBioRelationClassificationDataset(Dataset):
+    """ Class for handling BigBio relation data set"""
 
     def __init__(
             self,
@@ -511,7 +528,6 @@ class BigBioRelationClassificationDataset(Dataset):
             entity_side_information: Dict[str, str] = None,
             embedding_configurations: List[EmbeddingConfiguration] = None,
             structure_encoding_configurations: List[MoleculeStructureEncoderConfiguration] = None,
-            additional_train_data: Optional[List[Dataset]] = None
     ):
         if isinstance(splits, str):
             splits = [splits]
@@ -533,10 +549,9 @@ class BigBioRelationClassificationDataset(Dataset):
             use_norel_class=use_norel_class,
             label_to_id=label_to_id,
             limit_documents=limit_documents,
-            entity_side_information=entity_side_information,
+            textual_context_information=entity_side_information,
             embedding_configurations=embedding_configurations,
-            structure_encoding_configurations=structure_encoding_configurations,
-            additional_train_data=additional_train_data
+            structure_encoding_configurations=structure_encoding_configurations
         )
 
     def __getitem__(self, item):
@@ -564,16 +579,18 @@ class BigBioRelationClassificationDataset(Dataset):
             limit_documents: Optional[int] = None,
             entity_side_information: Optional[Dict[str, str]] = None,
             embedding_configurations: Optional[List[EmbeddingConfiguration]] = None,
-            structure_encoding_configurations: Optional[List[MoleculeStructureEncoderConfiguration]] = None,
-            additional_train_data: Optional[List[Dataset]] = None
+            structure_encoding_configurations: Optional[List[MoleculeStructureEncoderConfiguration]] = None
     ) -> Tuple[Dict[str, Dataset], Dict[str, int], List[Tuple]]:
 
+        # Build relation type to index mapping
         reltype_to_id = build_label_dictionary(data, use_no_relation_class)
         log.info(f" Label dictionary: {reltype_to_id}")
 
+        # Build the list of valid entity type pairs
         rel_pair_types = build_relation_pair_types(data)
         log.info(f" Relation types: {rel_pair_types}")
 
+        # Build a dataset for each split
         datasets = {}
         for split in splits:
             dataset = BigBioRelationClassificationDataset(
@@ -596,7 +613,6 @@ class BigBioRelationClassificationDataset(Dataset):
                 entity_side_information=entity_side_information,
                 embedding_configurations=embedding_configurations,
                 structure_encoding_configurations=structure_encoding_configurations,
-                additional_train_data=additional_train_data if split == "train" else None
             )
             log.info(f"  Size split {split}: {len(dataset)}")
             datasets[split] = dataset

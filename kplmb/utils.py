@@ -87,7 +87,7 @@ def finish(
 ) -> None:
     """Makes sure everything closed properly."""
 
-    # without this sweeps with wandb logger might crash!
+    # without this fix wandb logger might crash!
     for lg in logger:
         if isinstance(lg, WandbLogger):
             import wandb
@@ -144,6 +144,13 @@ def log_hyperparameters(
 
 
 def build_experiment_id(config: DictConfig) -> str:
+    """ Build an unique identifier for experiment highlight it's configuration.
+
+    :param config: Experiment configuration as DictConf
+
+    :return Unique identifier for the experiment configuration.
+
+    """
     id = ""
 
     for id_field in ID_FIELDS:
@@ -151,7 +158,6 @@ def build_experiment_id(config: DictConfig) -> str:
         for part in id_field.split("."):
             value = value[part]
         id += f"|{id_field}={value}"
-
 
     sides_infos = (
         ",".join([side_info_key for side_info_key,_ in config["side_info"].items()])
@@ -168,6 +174,13 @@ def log_results(
         logger: List[Logger],
         num_steps: Optional[int] = 1
 ):
+    """ Logs results to W&B.
+
+    :param result: Evaluation result scores
+    :param eval_prefix: Prefix (dev / test) of the evaluation scenario
+    :param logger: List of configured loggers
+    :param num_steps: Number of training steps
+    """
     for lg in logger:
         if isinstance(lg, WandbLogger):
             wandb_lg = cast(WandbLogger, lg)

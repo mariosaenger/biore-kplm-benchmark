@@ -24,9 +24,11 @@ log = utils.get_logger(__name__)
 
 @hydra.main(config_path="../_configs/", config_name="config.yaml")
 def train(config: DictConfig):
+    """ Runs the training pipeline.
+
+    :param config: Experiment configuration.
     """
-        Contains training pipeline.
-    """
+
     # Set seed for random number generators in pytorch, numpy and python.random
     if "seed" in config:
         pl.seed_everything(config.seed, workers=True)
@@ -43,73 +45,83 @@ def train(config: DictConfig):
     if config.tag:
         tags += [config.tag] if isinstance(config.tag, str) else config.tag
 
-    entity_side_information = None
+    entity_text_information = None
     embedding_configurations = None
     str_encoder_configurations = None
 
-    # Build side information configurations
-    if "side_info" in config:
-        entity_side_information = {}
+    # Build context information configurations
+    if "context_info" in config:
+        entity_text_information = {}
         embedding_configurations = []
         str_encoder_configurations = []
 
-        for side_info_key, side_info_config in config.side_info.items():
-            tags.append(side_info_key)
+        for context_info_key, context_info_config in config.side_info.items():
+            tags.append(context_info_key)
 
-            if side_info_config.type == "text":
-                tsv_file = hydra.utils.to_absolute_path(side_info_config.tsv_file)
-                side_data = pd.read_csv(tsv_file, sep="\t", index_col=side_info_config.id_column)
+            # Configure textual context information
+            if context_info_config.type == "text":
+                # Read tsv file containing the additional entity text information
+                tsv_file = hydra.utils.to_absolute_path(context_info_config.tsv_file)
+                entity_texts = pd.read_csv(tsv_file, sep="\t", index_col=context_info_config.id_column)
 
-                for entity_id, value in side_data[side_info_config.text_column].items():
-                    entity_side_information[str(entity_id)] = value
+                for entity_id, value in entity_texts[context_info_config.text_column].items():
+                    entity_text_information[str(entity_id)] = value
 
-            elif side_info_config.type == "embedding":
-                embedding_file = hydra.utils.to_absolute_path(side_info_config.embedding_file)
+            # Configure embedded context information
+            elif context_info_config.type == "embedding":
+                # Load embeddings
+                embedding_file = hydra.utils.to_absolute_path(context_info_config.embedding_file)
                 embeddings = torch.load(embedding_file, map_location=torch.device("cpu"))
 
-                mapping_file = hydra.utils.to_absolute_path(side_info_config.mapping_file)
+                # Load index to entity id mapping
+                mapping_file = hydra.utils.to_absolute_path(context_info_config.mapping_file)
                 mapping_data = pd.read_csv(mapping_file, sep="\t", index_col="entity_id")
                 mapping_data.index = mapping_data.index.map(lambda id: str(id))
                 entity_id_to_index = mapping_data["index"].to_dict()
 
+                # Build configuration object
                 embedding_conf = EmbeddingConfiguration(
-                    id=side_info_key,
+                    id=context_info_key,
                     embeddings=embeddings,
                     entity_id_to_embedding_index=entity_id_to_index,
-                    target=side_info_config.target,
-                    hidden_size=side_info_config.hidden_size,
-                    hidden_dropout=side_info_config.hidden_dropout,
-                    output_size=side_info_config.output_size,
-                    output_dropout=side_info_config.output_dropout,
-                    freeze_embeddings=side_info_config.freeze_embeddings
+                    target=context_info_config.target,
+                    hidden_size=context_info_config.hidden_size,
+                    hidden_dropout=context_info_config.hidden_dropout,
+                    output_size=context_info_config.output_size,
+                    output_dropout=context_info_config.output_dropout,
+                    freeze_embeddings=context_info_config.freeze_embeddings
                 )
 
-                assert side_info_config.target in ["both", "head", "tail"]
+                assert context_info_config.target in ["both", "head", "tail"]
                 embedding_configurations.append(embedding_conf)
 
-            elif side_info_config.type == "structure":
-                smiles_file = Path(hydra.utils.to_absolute_path(side_info_config.smiles_file))
+            # Configure embedded context information
+            elif context_info_config.type == "structure":
+                # Load smiles information from tsv file
+                smiles_file = Path(hydra.utils.to_absolute_path(context_info_config.smiles_file))
                 smiles_data = pd.read_csv(smiles_file, sep="\t", index_col="entity_id")
                 entity_id_to_smiles = smiles_data["smiles"].to_dict()
 
-                model_path = side_info_config.model_path
-                if side_info_config.is_local_model:
+                # Build molecular encoder model path
+                model_path = context_info_config.model_path
+                if context_info_config.is_local_model:
                     model_path = Path(hydra.utils.to_absolute_path(model_path))
 
+                # Build configuration object
                 str_encoder_config = MoleculeStructureEncoderConfiguration(
-                    id=side_info_key,
-                    target=side_info_config.target,
-                    encoder_type=side_info_config.encoder_type,
+                    id=context_info_key,
+                    target=context_info_config.target,
+                    encoder_type=context_info_config.encoder_type,
                     model_path=model_path,
                     entity_id_to_smiles=entity_id_to_smiles,
-                    max_length=side_info_config.max_length,
-                    freeze_encoder=side_info_config.freeze_encoder,
+                    max_length=context_info_config.max_length,
+                    freeze_encoder=context_info_config.freeze_encoder,
                 )
 
-                assert side_info_config.target in ["both", "head", "tail"]
+                assert context_info_config.target in ["both", "head", "tail"]
                 str_encoder_configurations.append(str_encoder_config)
 
-    # Load mention mapping
+    # Load entity mention id to entity database id mapping
     mention_mapping_file = hydra.utils.to_absolute_path(config.data.mention_mapping)
     mm_data = pd.read_csv(mention_mapping_file, sep="\t", index_col="mention_id")
 
@@ -117,6 +129,7 @@ def train(config: DictConfig):
     for mention_id, row in mm_data.iterrows():
         mention_mapping[str(mention_id)] = str(row["entity_id"])
 
+    # Adapt model path for locale models
     if config.model.transformer.startswith("_resources"):
         config.model.transformer = hydra.utils.to_absolute_path(config.model.transformer)
 
@@ -126,6 +139,7 @@ def train(config: DictConfig):
     # Add special tokens for entity marking to tokenizer if necessary
     entity_marker = EntityMarker.__getitem__(config.model.entity_marker)
     if entity_marker == EntityMarker.SPECIAL_TOKEN:
+        # Add special tokens to tokenizer
         special_tokens = [token for token in entity_marker.value]
         tokenizer.add_tokens(special_tokens, special_tokens=True)
 
@@ -181,27 +195,7 @@ def train(config: DictConfig):
             "test": data["test"]
         })
 
-    additional_train_data = None
-    if "aug_data" in config:
-        additional_train_data = []
-        llm_reda_ds_path = hydra.utils.to_absolute_path("bigbio/llm_reda")
-
-        for data_id, aug_data_config in config.aug_data.items():
-            aug_data = load_dataset(
-                path=llm_reda_ds_path,
-                name="llm_reda_bigbio_kb",
-                data_files=[hydra.utils.to_absolute_path(aug_data_config.data_file)]
-            )["train"]
-
-            if aug_data_config.limit_documents:
-                aug_data = aug_data.train_test_split(
-                    train_size=aug_data_config.limit_documents,
-                    seed=aug_data_config.seed
-                )["train"]
-
-            additional_train_data.append(aug_data)
-            tags.append(data_id)
-
+    # Prepare data set
     datasets, rel_to_id, pair_types = BigBioRelationClassificationDataset.create(
         data=data,
         mention_mapping=mention_mapping,
@@ -217,10 +211,9 @@ def train(config: DictConfig):
         blind_entities=config.model.blind_entities,
         use_no_relation_class=config.model.use_norel_class,
         limit_documents=config.data.limit_documents,
-        entity_side_information=entity_side_information,
+        entity_side_information=entity_text_information,
         embedding_configurations=embedding_configurations,
-        structure_encoding_configurations=str_encoder_configurations,
-        additional_train_data=additional_train_data
+        structure_encoding_configurations=str_encoder_configurations
     )
 
     # Init Lightning model
@@ -264,6 +257,7 @@ def train(config: DictConfig):
                 log.info(f"Instantiating logger <{lg_conf._target_}>")
                 logger.append(hydra.utils.instantiate(lg_conf, **kwargs))
 
+    # Build callback for evaluating the model after each epoch
     evaluation_callback = EvaluationCallback(
         metric_name="val/f1_epoch",
         dataset=data["validation"],
@@ -294,7 +288,6 @@ def train(config: DictConfig):
         collate_fn=model.collate_fn,
         batch_size=config.batch_size,
         num_workers=int(config.workers / 2) if config.workers > 1 else config.workers,
-        #pin_memory=True,
     )
 
     val_loader = DataLoader(
@@ -303,7 +296,6 @@ def train(config: DictConfig):
         collate_fn=model.collate_fn,
         batch_size=config.val_batch_size,
         num_workers=int(config.workers / 2) if config.workers > 1 else config.workers,
-        #pin_memory=True,
     )
 
     model.num_training_steps = len(train_loader) * trainer.max_epochs
@@ -315,6 +307,7 @@ def train(config: DictConfig):
     best_score = trainer.callback_metrics[config.model.optimized_metric]
     log.info(f"Best {config.model.optimized_metric} score: {best_score})")
 
+    # Run evaluation on test - if requested
     if config.run_test_evaluation:
         # Reload best model from training
         best_model_path = Path(trainer.checkpoint_callback.best_model_path)
