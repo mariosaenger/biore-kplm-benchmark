@@ -1,0 +1,23 @@
+id: chemprot
+
+dataset_path: bigbio/chemprot
+dataset_name: chemprot_shared_task_eval_bigbio_kb
+local: True
+
+is_doc_level: False
+mention_mapping: _resources/mention_mapping/chemprot.tsv
+
+max_sentence_distance: 0
+pair_generation_strategy: "all"
+
+create_val_from_train: False
+create_val_test_from_train: False
+val_size: 0
+test_size: 0
+split_seed: 42
+
+reduce_train: False
+reduce_train_size: 0
+reduce_train_seed: 0
+
+limit_documents: 1

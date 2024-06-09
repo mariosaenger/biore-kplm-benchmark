@@ -1,0 +1,23 @@
+id: ddi
+
+dataset_path: bigbio/ddi_corpus
+dataset_name: ddi_corpus_re_bigbio_kb
+local: True
+
+is_doc_level: False
+mention_mapping: _resources/mention_mapping/ddi.tsv
+
+max_sentence_distance: 0
+pair_generation_strategy: "ddi"
+
+create_val_from_train: True
+create_val_test_from_train: False
+val_size: 101
+test_size: 0
+split_seed: 221
+
+reduce_train: False
+reduce_train_size: 0
+reduce_train_seed: 0
+
+limit_documents: null

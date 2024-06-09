@@ -1,0 +1,22 @@
+_target_: kplmb.models.transformer.RelationClassificationTransformer
+
+id: bert-base-uncased
+transformer: bert-base-uncased
+
+optimized_metric: val/f1
+lr: 3e-5
+add_info_lr: null
+max_length: 512
+weight_decay: 0.0
+
+use_cls_token: true
+use_start_tokens: false
+use_end_tokens: false
+entity_marker: "NORMAL_MARKER"
+use_norel_class: True
+blind_entities: False
+input_prompt: "Is there a drug-protein/gene relation between [head] and [tail]? [SEP]"
+add_text_prompt: False
+num_context_sentences: 2
+
+use_xavier_init: False

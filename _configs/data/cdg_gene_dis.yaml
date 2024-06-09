@@ -1,0 +1,23 @@
+id: cdg_gene_dis
+
+dataset_path: bigbio/chem_dis_gene
+dataset_name: chem_dis_gene_curated_gene_dis_bigbio_kb
+local: True
+
+is_doc_level: True
+mention_mapping: _resources/mention_mapping/cdg.tsv
+
+max_sentence_distance: 2
+pair_generation_strategy: "all"
+
+create_val_from_train: False
+create_val_test_from_train: True
+val_size: 80
+test_size: 123
+split_seed: 128
+
+reduce_train: False
+reduce_train_size: 0
+reduce_train_seed: 0
+
+limit_documents: null

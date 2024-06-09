@@ -1,0 +1,37 @@
+# @package _global_
+
+# specify here default training configuration
+defaults:
+  - trainer: cpu
+  - model: bert-base
+  - data: bc5cdr_test
+  - callbacks: default   # set this to null if you don't want to use callbacks
+  - logger: wandb             # set logger here or use command line (e.g. `python run.py logger=wandb`)
+  - hydra: default
+  - side_info:
+
+# path to original working directory
+# hydra hijacks working directory by changing it to the current log directory,
+# so it's useful to have this path as a special variable
+# learn more here: https://hydra.cc/docs/next/tutorials/basic/running_your_app/working_directory
+work_dir: ${hydra:runtime.cwd}
+
+# path to folder with data
+data_dir: ${work_dir}/data/
+
+# pretty print config at the start of the run using Rich library
+print_config: True
+ignore_warnings: True
+
+debug: False
+
+run_test_evaluation: False  # Run evaluation on test set (yes / no)
+delete_checkpoint: True     # Delete best model after finishing the experiment (yes / no)
+tag: null                   # Tags to label the experiment
+
+seed: 42           # Random seed
+
+batch_size: 8      # batch size for training
+val_batch_size: 4  # batch size for validation
+
+workers: 0         # Number of workers for dataset loading

@@ -1,0 +1,23 @@
+id: bc5cdr
+
+dataset_path: bigbio/bc5cdr
+dataset_name: bc5cdr_bigbio_kb
+local: False
+
+is_doc_level: True
+mention_mapping: _resources/mention_mapping/bc5cdr.tsv
+
+max_sentence_distance: 2
+pair_generation_strategy: "all"
+
+create_val_from_train: False
+create_val_test_from_train: False
+val_size: 0
+test_size: 0
+split_seed: 42
+
+reduce_train: False
+reduce_train_size: 0
+reduce_train_seed: 0
+
+limit_documents: null
